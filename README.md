@@ -1,109 +1,346 @@
-﻿# machine-learning-repository
+# Predicción de Crímenes Violentos por Población
 
-README.md: Predicción de Crímenes Violentos por Población
-Este proyecto se enfoca en la predicción de la tasa de crímenes violentos por población (ViolentCrimesPerPop) utilizando el conjunto de datos "Communities and Crime Data Set" de UCI Machine Learning Repository. Se exploran diversas técnicas de preprocesamiento, selección de características, reducción de dimensionalidad y modelos de regresión para encontrar la mejor aproximación predictiva.
+## Descripción del Proyecto
 
-1. Configuración del Entorno
-Para ejecutar este cuaderno, necesitarás las siguientes librerías. Puedes instalarlas ejecutando los comandos pip:
+Este proyecto tiene como objetivo predecir la tasa de crímenes violentos por población (`ViolentCrimesPerPop`) utilizando el dataset **Communities and Crime** del repositorio UCI Machine Learning Repository.
 
+Durante el desarrollo se aplicaron técnicas de:
+
+* Preprocesamiento de datos
+* Manejo de valores faltantes
+* Selección de características
+* Reducción de dimensionalidad
+* Modelos de regresión y optimización de hiperparámetros
+
+El propósito fue identificar el modelo con mejor capacidad predictiva para el problema planteado.
+
+---
+
+# 1. Configuración del Entorno
+
+## Instalación de dependencias
+
+```bash
 pip install ucimlrepo umap-learn scikit-learn numpy pandas matplotlib seaborn
-Las librerías principales utilizadas son:
+```
 
-numpy
-pandas
-matplotlib
-seaborn
-sklearn (para preprocesamiento, modelos y evaluación)
-ucimlrepo (para cargar el dataset)
-umap (para reducción de dimensionalidad no lineal)
-2. Carga y Unificación de Datos
-El conjunto de datos se obtiene directamente de UCI Machine Learning Repository:
+## Librerías utilizadas
 
+* `numpy`
+* `pandas`
+* `matplotlib`
+* `seaborn`
+* `scikit-learn`
+* `ucimlrepo`
+* `umap-learn`
+
+---
+
+# 2. Carga y Unificación de Datos
+
+```python
 from ucimlrepo import fetch_ucirepo
+
 communities = fetch_ucirepo(id=183)
+
 X = communities.data.features
 y = communities.data.targets
+
 df = pd.concat([X, y], axis=1)
-X: Variables predictoras iniciales (1994, 127).
-y: Variable objetivo ViolentCrimesPerPop (1994, 1).
-df: DataFrame unificado (1994, 128).
-3. Preprocesamiento de Datos
-Se aplicaron los siguientes pasos de preprocesamiento:
+```
 
-3.1. Eliminación de Columnas Identificadoras
-Las columnas state, county, community, communityname, y fold fueron eliminadas ya que son identificadores y no aportan valor predictivo. El DataFrame resultante df_model tiene una dimensión de (1994, 123).
+### Dimensiones iniciales
 
-3.2. Conversión a Numérico
-Todas las columnas del DataFrame df_model fueron convertidas a tipo float64, forzando coerce los valores no numéricos a NaN.
+| Dataset                   | Dimensión   |
+| ------------------------- | ----------- |
+| Variables predictoras `X` | (1994, 127) |
+| Variable objetivo `y`     | (1994, 1)   |
+| Dataset completo `df`     | (1994, 128) |
 
-3.3. Manejo de Valores Faltantes
-Eliminación de columnas con alta proporción de NaN: Se eliminaron 22 columnas con más del 40% de valores faltantes (ej. PolicAveOTWorked, LemasTotalReq, PolicBudgPerPop). df_model quedó con una dimensión de (1994, 101).
-Imputación de OtherPerCap: La columna OtherPerCap, que tenía un solo valor faltante, fue imputada con la media de la columna.
-Imputación con IterativeImputer (SVR): Para el dataset completo (df_model_imputed), se utilizó IterativeImputer con un estimador SVR(kernel='rbf') para rellenar los valores faltantes. Este dataset imputado se usó para comparar el rendimiento de los modelos.
-3.4. Eliminación de Variables con Baja Variabilidad
-Se buscó eliminar variables con variabilidad muy baja (menos de 2 valores únicos), pero no se encontraron columnas con esta característica en ninguno de los datasets (df_model o df_model_imputed).
+---
 
-3.5. Eliminación de Variables Altamente Correlacionadas (Colinealidad)
-Se eliminaron variables altamente colineales (correlación absoluta > 0.90) entre sí para reducir la redundancia:
+# 3. Preprocesamiento de Datos
 
-df_model: Se eliminaron 32 variables, resultando en df_reduced de (1994, 69).
-df_model_imputed: Se eliminaron 38 variables, resultando en df_reduced_imputed de (1994, 85).
-3.6. División Entrenamiento-Test
-Los datos se dividieron en conjuntos de entrenamiento (80%) y prueba (20%) con random_state=42 para ambos datasets (X_final y X_final_imputed).
+## 3.1 Eliminación de Variables Identificadoras
 
-4. Análisis de Selección de Características (en X_final_imputed_reduced)
-Se realizó un análisis de selección de características más profundo en el dataset imputado (X_final_imputed) antes de la reducción de dimensionalidad:
+Se eliminaron las columnas:
 
-4.1. Análisis de Relevancia (Univariado)
-Se identificaron y eliminaron 7 variables con una correlación absoluta menor a 0.05 con la variable objetivo ViolentCrimesPerPop:
+* `state`
+* `county`
+* `community`
+* `communityname`
+* `fold`
 
-PctSameState85, PctVacMore6Mos, PctWorkMomYoungKids, LemasSwornFT, householdsize, racePctAsian, PctEmplManu.
-El dataset resultante, X_final_imputed_reduced, tiene una dimensión de (1994, 77).
+Estas variables no aportaban valor predictivo.
 
-4.2. Análisis de Redundancia (Colinealidad)
-Después de eliminar las variables de baja relevancia, no se encontraron variables con alta colinealidad (correlación > 0.90) en X_final_imputed_reduced.
+Dimensión resultante:
 
-5. Reducción de Dimensionalidad
-5.1. Análisis de Sensibilidad PCA
-Se evaluó el rendimiento de los mejores modelos SVR y MLP con X_final_imputed_reduced aplicando PCA para explicar diferentes porcentajes de varianza (85%, 90%, 95%, 99%).
+```text
+df_model → (1994, 123)
+```
 
-PCA para SVR y MLP:
-85% de varianza: 18 componentes
-90% de varianza: 24 componentes
-95% de varianza: 35 componentes
-99% de varianza: 51 componentes
-Los modelos MLP tuvieron un mejor rendimiento con PCA, alcanzando un Test_R2 de 0.6430 con 35 componentes (95% de varianza explicada), mientras que SVR se mantuvo más estable alrededor de 0.48-0.49 de Test_R2.
+---
 
-5.2. Reducción de Dimensión No Lineal con UMAP
-Se aplicó UMAP a X_final_imputed_reduced para proyectar los datos a 2 dimensiones (n_neighbors=15). Los datos transformados (umap_embedding) se visualizaron para observar la estructura no lineal. Posteriormente, se entrenaron los modelos SVR y MLP sobre estos datos reducidos por UMAP.
+## 3.2 Conversión a Datos Numéricos
 
-UMAP (2 componentes) para SVR y MLP:
-SVR UMAP: Test_R2 = 0.4222
-MLP UMAP: Test_R2 = 0.4813
-6. Modelos de Regresión Evaluados y Resultados
-Se implementó una función evaluate_regression_model para estandarizar la evaluación de todos los modelos utilizando KFold de 8 splits (shuffle=True, random_state=42) y las métricas MAE, RMSE y R².
+Todas las variables fueron convertidas a tipo `float64`, reemplazando valores inválidos por `NaN`.
 
-Los modelos evaluados incluyen:
+---
 
-Regresión Lineal: Evaluada con los datasets sin imputación y con imputación.
-Random Forest Regressor: Se utilizó RandomizedSearchCV (n_iter=40) para optimizar hiperparámetros (n_estimators, max_depth, min_samples_split, min_samples_leaf, max_features). Evaluado con y sin imputación.
-Support Vector Regressor (SVR): Se probaron diferentes combinaciones de kernel (linear, poly, rbf), C, degree (para poly) y gamma (para rbf). Evaluado con y sin imputación.
-K-Nearest Neighbors (KNN) Regressor: Se evaluó con diferentes valores de n_neighbors (5, 8, 10, 12, 15, 17, 20, 25, 30, 40, 50). Evaluado con y sin imputación.
-Artificial Neural Network – MLP Regressor: Se exploraron diversas arquitecturas (hidden_layer_sizes) y funciones de activación (relu, tanh, logistic) con solver='adam', max_iter=8000 y early_stopping=True. Evaluado con y sin imputación.
-Tabla Maestra de Resultados
-Una tabla master_results_df consolida los resultados de validación y prueba para todos los modelos y configuraciones, ordenada por Test_R2 de forma descendente. Los resultados principales (Test R²) para los modelos que tuvieron mejor rendimiento fueron:
+## 3.3 Manejo de Valores Faltantes
 
-Modelo	Val_MAE	Val_RMSE	Val_R2	Test_MAE	Test_RMSE	Test_R2
-SVR Imputed (Kernel: Poly, C=0.01, Deg=3)	0.094303	0.134409	0.670706	0.087626	0.124734	0.675157
-SVR Imputed (Kernel: RBF, Gamma=0.01, C=100)	0.091675	0.127353	0.703580	0.087070	0.124791	0.674858
-MLP Imputed (32,16) relu	0.098690	0.140209	0.640566	0.086205	0.124981	0.673870
-Conclusiones de los Resultados
-Imputación de Datos: Los modelos entrenados con el dataset imputado (df_model_imputed) generalmente obtuvieron un mejor desempeño, lo que subraya la importancia del manejo adecuado de los valores faltantes.
-Modelos Destacados: Los modelos SVR Imputed (Kernel: Poly, C=0.01, Deg=3) y MLP Imputed (32,16) relu mostraron el mejor rendimiento, alcanzando los valores más altos de  R2  en el conjunto de prueba (alrededor de 0.67-0.68).
-Reducción de Dimensionalidad:
-La aplicación de PCA con una varianza explicada del 95% (35 componentes) permitió a MLP alcanzar un  R2  de 0.6430, lo que demuestra la efectividad de PCA para conservar la información relevante para modelos lineales y no lineales.
-UMAP, al reducir los datos a solo 2 dimensiones, produjo un  R2  significativamente menor (SVR UMAP: 0.4222, MLP UMAP: 0.4813) en comparación con los modelos sin reducción de dimensionalidad o con PCA que retenía más componentes. Esto sugiere que, para este problema de predicción, una reducción tan drástica con UMAP no fue suficiente para preservar la información predictiva necesaria en un espacio tan reducido.
-7. Cómo Ejecutar el Cuaderno
-Abre el cuaderno en Google Colab o tu entorno Jupyter preferido.
-Instala las dependencias ejecutando las celdas de instalación (!pip install ...).
-Ejecuta todas las celdas en orden secuencial. El cuaderno está estructurado para que los pasos de preprocesamiento, modelado y evaluación se ejecuten de manera lógica.
+### Eliminación de columnas con demasiados NaN
+
+Se eliminaron 22 variables con más del 40% de datos faltantes.
+
+Ejemplos:
+
+* `PolicAveOTWorked`
+* `LemasTotalReq`
+* `PolicBudgPerPop`
+
+Dimensión resultante:
+
+```text
+df_model → (1994, 101)
+```
+
+### Imputación simple
+
+La variable `OtherPerCap` fue imputada usando la media.
+
+### Imputación avanzada
+
+Se utilizó `IterativeImputer` con un estimador:
+
+```python
+SVR(kernel='rbf')
+```
+
+El dataset imputado se almacenó en:
+
+```text
+df_model_imputed
+```
+
+---
+
+## 3.4 Eliminación de Variables con Baja Variabilidad
+
+No se encontraron variables con menos de 2 valores únicos.
+
+---
+
+## 3.5 Eliminación de Variables Altamente Correlacionadas
+
+Se eliminaron variables con correlación absoluta mayor a `0.90`.
+
+### Resultados
+
+| Dataset            | Variables eliminadas | Dimensión final |
+| ------------------ | -------------------- | --------------- |
+| `df_model`         | 32                   | (1994, 69)      |
+| `df_model_imputed` | 38                   | (1994, 85)      |
+
+---
+
+## 3.6 División Entrenamiento y Prueba
+
+Se realizó una división:
+
+* 80% entrenamiento
+* 20% prueba
+
+```python
+random_state = 42
+```
+
+---
+
+# 4. Selección de Características
+
+El análisis se realizó sobre:
+
+```text
+X_final_imputed
+```
+
+---
+
+## 4.1 Análisis de Relevancia
+
+Se eliminaron variables con correlación absoluta menor a `0.05` respecto a la variable objetivo.
+
+Variables eliminadas:
+
+* `PctSameState85`
+* `PctVacMore6Mos`
+* `PctWorkMomYoungKids`
+* `LemasSwornFT`
+* `householdsize`
+* `racePctAsian`
+* `PctEmplManu`
+
+Dimensión resultante:
+
+```text
+X_final_imputed_reduced → (1994, 77)
+```
+
+---
+
+## 4.2 Análisis de Redundancia
+
+No se encontraron variables altamente correlacionadas después de la reducción.
+
+---
+
+# 5. Reducción de Dimensionalidad
+
+## 5.1 PCA
+
+Se evaluó PCA conservando distintos porcentajes de varianza.
+
+| Varianza explicada | Componentes |
+| ------------------ | ----------- |
+| 85%                | 18          |
+| 90%                | 24          |
+| 95%                | 35          |
+| 99%                | 51          |
+
+### Resultados destacados
+
+* Los modelos `MLP` obtuvieron mejor desempeño usando PCA.
+* El mejor resultado fue:
+
+```text
+Test_R2 = 0.6430
+```
+
+con:
+
+```text
+35 componentes (95% de varianza)
+```
+
+---
+
+## 5.2 UMAP
+
+Se aplicó UMAP reduciendo los datos a 2 dimensiones:
+
+```python
+n_neighbors = 15
+```
+
+### Resultados
+
+| Modelo   | Test_R2 |
+| -------- | ------- |
+| SVR UMAP | 0.4222  |
+| MLP UMAP | 0.4813  |
+
+La reducción extrema a 2 dimensiones produjo una pérdida importante de información predictiva.
+
+---
+
+# 6. Modelos Evaluados
+
+Se implementó una función de evaluación utilizando:
+
+* `KFold` con 8 particiones
+* `shuffle=True`
+* `random_state=42`
+
+## Métricas utilizadas
+
+* MAE
+* RMSE
+* R²
+
+---
+
+## Modelos entrenados
+
+### Regresión Lineal
+
+* Con imputación
+* Sin imputación
+
+### Random Forest Regressor
+
+Optimización mediante:
+
+```python
+RandomizedSearchCV
+```
+
+### Support Vector Regressor (SVR)
+
+Configuraciones evaluadas:
+
+* `linear`
+* `poly`
+* `rbf`
+
+### KNN Regressor
+
+Distintos valores de:
+
+```python
+n_neighbors
+```
+
+### MLP Regressor
+
+Se probaron diferentes arquitecturas y funciones de activación:
+
+* `relu`
+* `tanh`
+* `logistic`
+
+---
+
+# 7. Mejores Resultados
+
+| Modelo                                       | Test_MAE | Test_RMSE | Test_R2  |
+| -------------------------------------------- | -------- | --------- | -------- |
+| SVR Imputed (Kernel: Poly, C=0.01, Deg=3)    | 0.087626 | 0.124734  | 0.675157 |
+| SVR Imputed (Kernel: RBF, Gamma=0.01, C=100) | 0.087070 | 0.124791  | 0.674858 |
+| MLP Imputed (32,16) relu                     | 0.086205 | 0.124981  | 0.673870 |
+
+---
+
+# 8. Conclusiones
+
+* Los modelos entrenados con datos imputados obtuvieron mejores resultados generales.
+
+* Los mejores modelos fueron:
+
+  * `SVR Imputed (Kernel: Poly, C=0.01, Deg=3)`
+  * `MLP Imputed (32,16) relu`
+
+* Ambos alcanzaron valores de `R²` cercanos a `0.67`, mostrando una buena capacidad predictiva.
+
+* PCA conservó mejor la información relevante que UMAP para este problema.
+
+* La selección de características y el manejo de valores faltantes influyeron significativamente en el desempeño final.
+
+---
+
+# 9. Ejecución del Proyecto
+
+1. Abrir el notebook en Google Colab o Jupyter.
+2. Instalar las dependencias.
+3. Ejecutar todas las celdas en orden secuencial.
+
+El proyecto está estructurado para ejecutar automáticamente:
+
+* Preprocesamiento
+* Modelado
+* Evaluación
+* Comparación de resultados
+
+
+Link del video
+https://youtu.be/UTq2AwSToD4
